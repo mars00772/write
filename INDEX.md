@@ -10,14 +10,12 @@
 >* linux system 近期工作主要在linux服务器，一些备忘录
 >* the c10k problem
 >* the c10m problem
->* the linux loadavage and the system
->* advanced programming unix environment必读经典啊
->* [笔记1](http://blogread.cn/it/article/3344?f=wb#original)
->* 相关1
->* 相关2
->* unix network programming必读经典2
->* 相关1
->* 相关2
+>* the linux loadavage
+>* advanced programming unix environment 必读经典啊
+>* [笔记](http://blogread.cn/it/article/3344?f=wb#original)
+>* unix network programming 必读经典2
+>* [unp12e笔记](http://koo987.tumblr.com/post/112124265861/unp1-unp1)
+>* [unp22e笔记](!#)
 
 ###Tools
 >* [markdown编辑器](http://koo987.tumblr.com/post/108342265816/blog) 本blog全部在stackedit完成markdown编辑、发布、维护。
@@ -27,7 +25,7 @@
 >* libevent，著名网络库，是实习的时候粗读的第一个网络库
 >* libev，坊间流传是比libevent更高性能的网络库
 >* muduo，作者陈硕先生理想中的C++网络库，是工作后阅读的第二个网络库
->* [Exceptional TCP/IP Programming](#Exceptional_TCP) 一本在全局观点看TCP/IP的书
+>* [Effective TCP/IP Programming](#Exceptional_TCP) 一本在全局观点看TCP/IP的书
 
 ###Protocols
 >* protocol buffer vs thrift
@@ -35,14 +33,15 @@
 ###Programming Language
 >* C++ 和它的四书五经
 	> 1. [Effective C++](#effectiveCPP)
-	> 2. [Effective STL](#effectiveSTL)
-	> 3. [Exceptional C++ Style](#Exceptional_C_Style)
->* Python
+    > 2. [More Effective C++](#More_EffectiveCPP)
+    > 3. [Effective STL](#effectiveSTL)
+    > 4. [Exceptional C++ Style](#Exceptional_C_Style)
+>* Python 目前仅用python+swig来写测试夹具，显著提高debug速度
 >* [lua](http://blog.codingnow.com/2015/01/lua_53_doc.html)
 
 ###Distributed System
 >* [各种名词](http://book.mixu.net/distsys/single-page.html)
->* [Dapper](http://koo987.tumblr.com/post/109023997676/notes-on-dapper)  Google大型分布式系统Trace设施，论文阅读笔记
+>* [Dapper](http://koo987.tumblr.com/post/109023997676/notes-on-dapper)  Google分布式系统Trace设施，论文阅读笔记，公司内部有两个分布式跟踪项目，在线上bug、遇难杂症的调查时多次成为我的‘the only helpful tool’
 >* zipkin [release](https://github.com/twitter/zipkin/releases),[文档](http://twitter.github.io/zipkin/index.html)
 >* paxos 分布式一致性算法
 >* CAP
@@ -59,11 +58,11 @@
 ###Algorithms
 
 ###Books 
->* <span id="effectiveCPP">[Effective C++](http://koo987.tumblr.com/post/109397999486/notes-on-effective-c)</span>实用而必读，据传没看过effective系列写生产线C++代码会挖坑不止
+>* <span id="effectiveCPP">[Effective C++](http://koo987.tumblr.com/post/109397999486/notes-on-effective-c)</span>
+>* <span id="More_EffectiveCPP">[More Effective C++](http:xx)</span>实用而必读，据传没看过Effective系列写生产线C++代码会挖坑不止
 >* <span id="effectiveSTL">[Effective STL](http://koo987.tumblr.com/post/109397999486/notes-on-effective-c)</span>尝试用思维导图画了下各章节的内容
-> * <span id="Exceptional_C_Style">Exceptional C++ Style</span> 
-> * <span id="Exceptional_TCP">Effective TCP/IP Programming</span> 
->* release it! 总结了许多模式，反模式
+>* <span id="Exceptional_C_Style">Exceptional C++ Style</span> 
+>* <span id="Exceptional_TCP">Effective TCP/IP Programming</span> 
 
 
 ###Articles

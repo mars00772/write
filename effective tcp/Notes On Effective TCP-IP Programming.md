@@ -4,7 +4,7 @@
 在全局的角度对TCP/IP编程的解读，我大概翻阅了其中的TCP部分，暂且跳过UDP部分。
 
 ------
-[toc]
+[TOC]
 
 ##Item 1 基于连接与无连接的区别
 >*所谓无连接的协议，是说每个数据包(ip层之上)都是彼此独立处理的，每个数据报(datagram)独立编址并发送，所以说网络层尽力去传输每个数据包，但难以保证不丢失。
@@ -87,7 +87,7 @@
 >* wired，ignored
 ##Item 20 考虑使用事件驱动
 >* will talk later in other blog,ignored
-##Item 21 TIME-WAIT不能帮忙关闭连接
+##Item 21 TIME-WAIT Assassination不能帮忙关闭连接
 >* time-wait其实被TCP状态机隐藏了，很少人知道他的用途和重要性。
 >* A发送一个FIN给B，B确认这个FIN消息，回复一个ACK，接着，B也关闭他那端的连接，接着发一个FIN给A，A返回一个ACK。
 >* 从这以后，B关闭连接，释放资源，因为他认为，这个连接已经不存在了
@@ -95,7 +95,28 @@
 从上述例子中可以看出TIME-WAIT的特点
 >* 通常情况下，仅有一方（主动关闭操作的一方）进入TIME-WAIT状态
 >* TIME-WAIT状态时，有数据到达，则重新启动2MSL计时器
+
 为何需要TIME-WAIT？
+![time-wait](https://raw.githubusercontent.com/mars00772/write/master/effective%20tcp/time_wait.jpg)
+如上图，TIME-WAIT发生的典型场景，主动关闭的一方才会进入TIME-WAIT(如果同时关闭，那么他们会同时进入TIME-WAIT状态)，BSD派生的系统时常大概为30s~2分钟。
+>* 上图中HOST 1发送的ACK如果丢失，HOST 2将会重新发送FIN，TIME-WAIT状态就是在维护这种连接状态。**如果没有TIME-WAIT，HOST 2重新发送的FIN HOST 1无法认识，于是他回复一个RST（重新启动），这样HOST 2就进入错误的状态（而不是有序终止的状态）**
+>* TCP通过窗口处理重传数据，如果延迟的数据在当前接收窗口之外，丢弃之，如上所说，如果重传或延迟的段在连接关闭后达到，将丢弃并返回RST消息，**问题是当对端收到该RST时，一条基于相同主机相同端口的新连接如果存在，而恰好该数据的seq序列号在新连接的接收窗口中，数据就会被接收，新连接就被破坏了**。
+>* TCP通过 TIME-WAIT确保旧socket对（两个相同IP，相同端口）的迷失的数据报在网络上消失之前，不会被重用。
+
+TIME-WAIT Assassination
+RFC说确实存在上面讨论的过早关闭TIME-WAIT状态的可能性，被称之为TIME-WAIT Assassination。是的，TIME-WAIT状态自杀。
+>* 一个处于TIME-WAIT 状态的连接收到一个不可接受的旧数据段(序列号在接收窗口之外)，TCP响应一个ACK消息（！！惊，该去复习下流程)，告诉对方自己能接受的序列号，然而，对方早已发送过FIN，于是以RST响应该ACK，当一个RST到达TIME-WAIT 状态的连接时，TCP立即关闭连接  0 0 -----它自杀了
+>* RFC建议TIME-WAIT 时的状态忽略RST，似乎并未被官方采用
+
+## Item 23 服务器应该设置SO_REUSEADDR选项
+这个Item是仅读标题就知道他要说的东西，服务器挂掉立即重启时，会bind失败，提示地址已经被使用，原因是：
+>* TCP TIME-WAIT状态,不允许重新启动，因为前面的连接处于TIME-WAIT状态
+>* TCP连接由四元组指定，{local ip,local port,peer ip,peer port},本来就算立即启动服务使用相同端口也不会有任何问题，所以为何要限制新服务的启动？
+>* 问题出在SOCKET API上，需要调用两个函数来完全指定连接地址在，在调用bind函数时，并不知道将会调用connect，即使调用了也不知道他是指定一个连接或使用已经存在的那个。
+>* SO_REUSEADDR是危险的吗？
+
+
+
 
 
 > Written with [StackEdit](https://stackedit.io/).
