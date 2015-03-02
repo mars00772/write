@@ -8,7 +8,7 @@
 ------
 ## 第二章：传输层TCP与UDP
 传输层的协议，即TCP/UDP，他们使用网络层IP协议，其实可以绕过传输层直接使用IPV4/V6接口，被称之为原始套接字接口。
-![TCP/IP协议概貌]() todo
+![TCP/IP协议概貌](https://raw.githubusercontent.com/mars00772/write/master/unp1/tcp%E5%8D%8F%E8%AE%AE%E6%A6%82%E8%B2%8C.JPG)
 traceroute是用了ICMP和IP套接字接口，后续将会尝试开发一个IPV4/IPV6的ping与traceroute.
 >* 通过在bind指定IP地址来说明他只接受某个特定本地接口的外来连接，使用INADDR_ANY来指定任意的本地IP。
 2.9 缓冲区大小及限制
@@ -120,14 +120,15 @@ bind的用途，嗯，意思是捆绑地址A，端口P到套接字S，把特定�
 >* 客户端一般不bind客户端，而是由内核根据输出来选择源IP地址。
 
 listen函数仅被服务器调用，将客户端调用connect的套接字转换为被动套接字，指示内核接受指向此套接字的连接请求，TCP状态图指示，listen将套接字从close转换为listen状态。listen的backlog指示此套接字排队的长度，需要较大backlog长度的原因是：**未完成连接队列中的挑明随着客户端SYN分节的到达并等待三次握手的完成而增大 **
-[listen队列示意图]() todo listen队列示意图
+![listen队列示意图](https://raw.githubusercontent.com/mars00772/write/master/unp1/listen%E7%9A%84%E9%98%9F%E5%88%97.JPG) listen队列示意图
 
 accept函数由服务器调用，从已完成连接队列头返回下一个已完成连接，若为空，则进程睡眠（阻塞方式），accept返回内核自动生成的全新套接字（称为连接套接字）。
 fork函数最神奇的部分是调用一次，却返回两次，在调用进程返回一次，返回的是子进程pid，在新派生的进程返回0。
 accept返回前连接夭折的情况：
 三次握手完成，连接建立后，客户端返回一个RST，模拟场景是，服务器调用socket，bind，listen，然后先sleep再accept，此时客户端的connect返回后，立即调用SOCKET-OPT，SO_LINGER以生成RST，Posix.1g是内核返回给application，提示错误ECONNABORTED，此时只要忽略错误，简单地再调用一次accept即可。
 ###客户端停止
-这是正常行为，但由于父进程未处理SIGCHLD信号，子进程变成僵尸进程。unix系统的这个设定是为了给父进程维护id，CPU，内存等资源使用信息， 下图描述了客户端停止的时序图。todo
+这是正常行为，但由于父进程未处理SIGCHLD信号，子进程变成僵尸进程。unix系统的这个设定是为了给父进程维护id，CPU，内存等资源使用信息， 下图描述了客户端停止的时序图.
+![停止的时序图](https://raw.githubusercontent.com/mars00772/write/master/unp1/TCP%E5%9B%9B%E6%AC%A1%E6%8F%A1%E6%89%8B%E5%85%B3%E9%97%AD%E8%BF%9E%E6%8E%A5.JPG)
 ###处理SIGCHLD信号
 信号可以由内核发给进程，或者进程发给进程（包括自己），捕获SIGCHLD信号，并在处理函数中调用wait，即可处理僵尸进程。需要注意的是**unix信号是不排队的**，这带来的一个问题是当有N个子进程被终止，父进程同时收到SIGCHLD信号，但使用wait函数时只信号handle只处理了一次，导致仍有0~N-1个僵尸进程。所以作者强调，使用waitpid在有未终止的子进程时，不要阻塞。
 ```
@@ -192,7 +193,8 @@ int select(int maxfdp1,fd_set* readset,fd_set* writeset,fd_set* exceptset,const 
 
 ###重写str_cli函数
 上节中，服务器主动关闭，套接字发生了些事情，客户端却阻塞在fgets上，新版本目标是让其阻塞在select上，或是等待标准输入，或是等待套接字可读。
-三个条件，图，todo：
+三个条件:
+![图](https://raw.githubusercontent.com/mars00772/write/master/unp1/select%E5%AF%BC%E8%87%B4%E5%8F%AF%E8%AF%BB%E5%8F%AF%E5%86%99%E7%9A%84%E6%9D%A1%E4%BB%B6%E6%80%BB%E7%BB%93.JPG)
 1.socket可读，read返回大于0的val==>即字节数
 2.对方发一个FIN（进程关闭），套接字可读，返回一个0（即EOF）
 3.对方发一个RST（主机重启），套接字可读，返回一个-1，errno有明确的错误码。
@@ -237,7 +239,8 @@ close函数是终止网络连接的正常方法，但它有几个限制：
 >* close将访问计数-1，仅为0时我们才关闭套接字，详细见4.8节，shutdown是触发FIN分节
 >* close同时终止了读和写两个方向，导致上节讨论的问题
 
-图，shutdown关闭了一半的TCP连接，todo
+图，shutdown关闭了一半的TCP连接：
+![shutdown](https://raw.githubusercontent.com/mars00772/write/master/unp1/shutdown%E8%B0%83%E7%94%A8%E5%85%B3%E9%97%ADTCP%E4%B8%80%E5%8D%8A%E7%9A%84%E8%BF%9E%E6%8E%A5.JPG)
 三种关闭方式
 >* SHUT_RD关闭读的这一半，不再接收套接字的数据而且，现留在buffer的数据都作废，不能执行任何读操作了
 >* SHUT_WR关闭写的这一半，当前在buffer内的数据都被发送，但此后不该执行任何写相干操作。

@@ -217,11 +217,48 @@ operator new[]与operator delete[]和new与delete相类似
 类中存在指针时，在构造函数中需要考虑出现异常的情况：异常将导致以前初始化的其它指针成员不能删除，从而产生资源泄漏解决办法是在构造函数中考虑异常处理，产生异常时释放已分配的资源最好的方法是使用对象封装资源
 
 ##Item 11：禁止异常信息传递到析构函数外
-禁止异常传递到析构函数外的两个原因：第一能够在异常传递的堆栈辗转开解的过程中，防止terminate被调用；第二它能帮助确保析构函数总能完成我们希望它做的所有事情
+禁止异常传递到析构函数外的两个原因：
+>* 第一能够在异常传递的堆栈辗转开解的过程中，防止terminate被调用；
+>* 第二它能帮助确保析构函数总能完成我们希望它做的所有事情
+
 解决方法是在析构函数中使用try-catch块屏蔽所有异常
 
 ##Item 12：理解抛出一个异常与传递一个参数或调用一个虚函数间的差异
-有 三个主要区别：第一，异常对象在传递时总被进行拷贝当通过传值方式捕获时，异常对象被拷贝了两次对象作为参数传递给函数时不需要被拷贝；第二，对象作 为异常被抛出与作为参数传递给函数相比，前者类型转换比后者少（前者只有两种转换形式：继承类与基类的转换，类型化指针到无类型指针的转换）；最后一点， catch子句进行异常类型匹配的顺序是它们在源代码中出现的顺序，第一个类型匹配成功的擦他处将被用来执行当一个对象调用一个虚函数时，被选择的函数 位于与对象类型匹配最佳的类里，急事该类不是在源代码的最前头
+异常有这么多新概念闻所未闻，真是大开眼界，有人说C++的异常是一个鸡肋，但大师说异常是很有用的，当年我们喜欢用errno去detect错误，
+```cpp
+void f(Widget w) ...                 // 通过传值
+catch (Widget w) ...                 // 通过传值捕获异常 
+catch (Widget& w) ...               // 通过传递引用捕获 
+catch (const Widget& w) ...        // 通过传递指向const的引用
+```
+传递函数参数与异常的途径可以是传值、传递引用或传递指针，这是相同点，但系统完成的操作过程是完全不同的，产生的原因是：你调用函数时，程序的控制权最终还会返回到函数的调用处，但是
+当你抛出一个异常时，控制权永远不会回到抛出异常的地方。**所以无论通过传值还是引用传递异常的参数都会由于离开生存空间析构掉，他所以必须传递的是拷贝。**，另外，被拷贝的是静态类型而非动态。
+```cpp
+class Widget { ... }; 
+class SpecialWidget: public Widget { ... }; 
+void passAndThrowWidget() 
+{ 
+  SpecialWidget localSpecialWidget; 
+  ... 
+  Widget& rw = localSpecialWidget;      // rw 引用SpecialWidget 
+  throw rw;                            // 它抛出一个类型为Widget的异常 
+} 
+```
+```
+catch (Widget& w)                 // 捕获Widget异常 
+{ 
+  throw;                          // 重新抛出异常，让它继续传递，good，
+								  //他仍是SpecialWidget的异常
+}
+catch (Widget& w)               
+{ 
+  throw w;                        // 传递被捕获异常的拷贝，bad，改变了w的类型
+} 
+```
+有三个主要区别：
+>* 第一，异常对象在传递时总被进行拷贝，当通过传值方式捕获时，**异常对象被拷贝了两次对象**，作为参数传递给函数时不一定需要被拷贝；
+>* 第二，对象作为异常被抛出与作为参数传递给函数相比，前者类型转换比后者少（前者只有两种转换形式：继承类与基类的转换，类型化指针到无类型指针的转换）；
+>* 最后一点， catch子句进行异常类型匹配的顺序是它们在源代码中出现的顺序，第一个类型匹配成功的擦他处将被用来执行当一个对象调用一个虚函数时，被选择的函数 位于与对象类型匹配最佳的类里，急事该类不是在源代码的最前头
 
 ##Item 13：通过引用捕获异常
 有三个选择可以捕获异常：第一指 针，建立在堆中的对象必需删除，而对于不是建立在堆中的对象，删除它会造成不可预测的后果，因此将面临一个难题：对象建立在堆中还是不在堆中；第二传 值，异常对象被抛出时系统将对异常对象拷贝两次，而且它会产生对象切割，即派生类的异常对象被作为基类异常对象捕获时，它的派生类行为就被切割调了 这样产生的对象实际上是基类对象；第三引用，完美解决以上问题
@@ -234,75 +271,338 @@ operator new[]与operator delete[]和new与delete相类似
 三 个方面：第一需要空间建立数据结构来跟踪对象是否被完全构造，还需要系统时间保持这些数据结构不断更新；第二try块无论何时使用它，都得为此付出 代价编译器为异常规格生成的代码与它们为try块生成的代码一样多，所以一个异常规格一般花掉与try块一样多的系统开销第三抛出异常的开销因为 异常很少见，所以这样的事件不会对整个程序的性能造成太大的影响
 
 ##Item 16：牢记80%/20%准则
-8020准则说的是大约20%的代码使用了80%的程序资源，即软件整体的性能取决于代码组成中的一小部分使用profiler来确定程序中的那20%，关注那些局部效率能够被极大提高的地方
+80-20准则说的是大约20%的代码使用了80%的程序资源，即软件整体的性能取决于代码组成中的一小部分使用profiler来确定程序中的那20%，关注那些局部效率能够被极大提高的地方。
+大师告诫我们，找瓶颈不是靠猜，大多数程序员们的直觉是错的，程序的性能特征往往不能靠直觉来确定，真确的发生在我自己和周围的“为了提高程序各部分效率而倾注了大量精力，但却吃力不讨好，对整体的程序性能没有显著影响”。
+我们应该使用profiler去识别程序的20%部分，当然profiler如果不输入有代表性的数据，其显示的结果不一定有帮助，这是一个巨大的话题，将会晚点讨论。
 
 ##Item 17：考虑使用懒惰计算法
-懒惰计算法的含义是拖延计算的时间，等到需要时才进行计算其作用为：能避免不需要的对象拷贝，通过使用operator[]区分出读写操作，避免不需要的数据库读取操作，避免不需要的数字操作但是，如果计算都是重要的，懒惰计算法可能会减慢速度并增加内存的使用
+懒惰计算法的含义是**拖延计算的时间**，等到需要时才进行计算。
+>* 引用计数，其实是在说string的copy on write
+>* 还是在说string的读和写，栗子是：
+```
+String s = "Homer's Iliad";            // 假设是一个reference-counted string 
+cout << s[3];                         // 调用 operator[] 读取s[3] 
+s[3] = 'x';                           // 调用 operator[] 写入 s[3] 
+```
+如何在operator[]中判断是读取还是写入操作呢。抱歉做不到，但是**通过使用lazy evaluation和条款M30中讲述的proxy class，我们可以推迟做出是读操作还是写操作的决定，直到我们能判断出正确的答案。**
+>* Lazy Fetching，是说对于大型对象，当 用到的时再从db、磁盘取
+```
+class LargeObject { 
+public: 
+  LargeObject(ObjectID id);  
+  const string& field1() const; 
+  int field2() const;
+  ...  
+private: 
+  ObjectID oid;  
+  mutable string *field1Value;// mutable声明以在const成员函数内修改他
+  mutable int *field2Value;  
+  ...  
+};  
+LargeObject::LargeObject(ObjectID id) 
+: oid(id), field1Value(0), field2Value(0), field3Value(0), ... 
+{}  
+const string& LargeObject::field1() const 
+{ 
+  if (field1Value == 0) { 
+   // 从数据库中为filed 1读取数据，使field1Value 指向这个值; 
+}  
+  return *field1Value; 
+```
+ 
 
 ##Item 18：分期摊还期望的计算
-核心是使用过度热情算法，有两种方法：缓存那些已经被计算出来而以后还有可能需要的值；预提取，做比当前需要做的更多事情
+核心是使用过度热情算法，有两种方法：
+>* **缓存**那些已经被计算出来而以后还有可能需要的值；
+>* **预提取**，做比当前需要做的更多事情。
+
 当必须支持某些操作而不总需要其结果时，可以使用懒惰计算法提高程序运行效率；当必须支持某些操作而其结果几乎总是被需要或不止一次地需要时，可以使用过度热情算法提高程序运行效率
 
 ##Item 19：理解临时对象的来源
-临时对象产生的两种条件：为了是函数成功调用而进行隐式类型转换和函数返回对象时
-临时对象是有开销的，因此要尽可能去消除它们，然而更重要的是训练自己寻找可能建立临时对象的地方在任何时候只要见到常量引用参数，就存在建立临时对象而绑定在参数上的可能性在任何时候只要见到函数返回对象，就会有一个临时对象被建立（以后被释放）
+大师说往往有些人把临时对象和局部变量混淆，临时变量根本不出现在源代码中，是一个非堆对象。
+临时对象产生的两种条件：**函数成功调用而进行隐式类型转换和函数返回对象时**。
+```cpp
+// 一个函数调用隐式转换产生临时对象的例子
+void uppercasify(string& str);
+char str[]="xxxxx";
+uppercasify(str);//错误，因为str是一个reference to non const，c++不允许对其发生隐式转换（符合直觉）
+//一个函数返回对象时产生临时对象的例子
+const Number operator+(const Number& lhs,const Number& rhs); 
+//改进方案在Item 22有讨论
+```
 
-##Item 20：协助完成返回值优化
-应当返回一个对象时不要试图返回一个指针或引用
-C+ +规则允许编译器优化不出现的临时对象，所有最佳的办法莫过于：retrun Ratinal(lhs.numerator()*rhs.numerator(), lhs.denominator()*rhs.denominator())这种优化是通过使用函数的retuan location（或者用在一个函数调用位置的对象来替代），来消除局部临时对象，这种优化还有一个名字：返回值优化
+临时对象是有开销的，因此要尽可能去消除它们，然而更重要的是训练自己寻找可能建立临时对象的地方，在任何时候只要见到常量引用参数，就存在建立临时对象而绑定在参数上的可能性。在任何时候只要见到函数返回对象，就会有一个临时对象被建立（以后被释放）。
+
+##Item 20：协助完成返回值优化(RVO)
+应当返回一个对象时不要试图返回一个指针或引用，炒冷饭了。总的来说：
+```
+const Rational operator*(const Rational& lhs,const Rational& rhs); 
+//甚至不用看operator*的代码，我们就知道它肯定要返回一个对象
+```
+C+ +规则允许编译器优化不出现的临时对象，所有最佳的办法莫过于：
+```
+retrun Ratinal(lhs.numerator()*rhs.numerator(), lhs.denominator()*rhs.denominator())
+```
+这种优化是通过使用函数的retuan location（或者用在一个函数调用位置的对象来替代），来消除局部临时对象，这种优化还有一个名字：返回值优化
 
 ##Item 21：通过重载避免隐式类型转换
-隐式类型转换将产生临时对象，从而带来额外的系统开销
-解决办法是使用重载，以避免隐式类型转换要注意的一点是在C++中有一条规则是每一个重载的operator必须带有一个用户定义类型的参数（这条规定是有道理的，如果没有的话，程序员将能改变预定义的操作，这样做肯定吧程序引入混乱的境地）
+隐式类型转换将产生临时对象，从而带来额外的系统开销。
+解决办法是使用重载，以避免隐式类型转换要注意的一点是在C++中有一条规则是**每一个重载的operator必须带有一个用户定义类型的参数**（这条规定是有道理的，如果没有的话，程序员将能改变预定义的操作，这样做肯定把程序引入混乱的境地，10+10都的预定义都被改变啦）
 另外，牢记8020规则，没有必要实现大量的重载函数，除非有理由确信程序使用重载函数后整体效率会有显著提高
 
 ##Item 22：考虑用运算符的赋值形式取代其单独形式
-运算符的赋值形式不需要产生临时对象，因此应该尽量使用对运算符的单独形式的最佳实现方法是return Rational(lhs) += rhs;这种方法将返回值优化和运算符的赋值形式结合起来，即高效，又方便
+运算符的赋值形式不需要产生临时对象，因此应该尽量使用对运算符的单独形式的最佳实现方法
+```
+return Rational(lhs) += rhs;
+```
+这种方法将返回值优化和运算符的赋值形式结合起来，即高效，又方便。
 ##Item 23：考虑变更程序库
-程序库必须在效率和功能等各个方面有各自的权衡，因此在具体实现时应该考虑利用程序库的优点例如程序存在I/O瓶颈，就可以考虑用stdio替代iostream
+程序库必须在效率和功能等各个方面有各自的权衡，因此在具体实现时应该考虑利用程序库的优点例如程序存在I/O瓶颈，就可以考虑用stdio替代iostream。
 
 ##Item 24：理解虚拟函数多继承虚基类和RTTI所需的代价
-虚函数所需的代价：必须为每个包含虚函数的类的virtual table留出空间；每个包含虚函数的类的对象里，必须为额外的指针付出代价；实际上放弃了使用内联函数
-多继承时，在单个对象里有多个vptr（一个基类对应一个）它和虚基类一样，会增加对象体积的大小
-RTTI能让我们在运行时找到对象和类的有关信息，所以肯定有某个地方存储了这些信息，让我们查询这些信息被存储在类型为type_info的对象里，可以通过typeid操作符访问到一个类的typeid对象通常，RTTI被设计为在类的vbtl上实现
+虚函数所需的代价：必须为每个包含虚函数的类的virtual table留出空间；每个包含虚函数的类的对象里，必须为额外的指针付出代价；
+```
+void makeACall(C1 *pC1) 
+{ 
+  pC1->f1();//这种调用，虚函数本身不是性能瓶颈，虚函数所需要的代价与内连有关
+} 
+```
+虚函数是不能内联的？这是因为“内联”是指“在编译期间用被调用的函数体本身来代替函数调用的指令，”但是虚函数的“虚”是指“直到运行时才能知道要调用的是哪一个函数。
+
+多继承时，在单个对象里有多个vptr（一个基类对应一个）它和虚基类一样，会增加对象体积的大小。
+RTTI能让我们在运行时找到对象和类的有关信息，所以肯定有某个地方存储了这些信息，让我们查询这些信息被存储在类型为type_info的对象里，可以通过typeid操作符访问到一个类的typeid对象通常，RTTI被设计为在类的vbtl上实现。
 
 ##Item 25：将构造函数和非成员函数虚拟化
-构 造函数的虚拟化看似无意义，但是在实际当中有一定的用处例如，在类中构建一个虚拟函数，其功能仅仅是实现构造函数，就可以对外界提供一组派生类的公共构 造接口虚拟拷贝构造函数也是可以实现的，但是要利用到最近才被采纳的较宽松的虚拟函数返回值类型规则被派生类重定义的虚拟函数不用必须与基类的虚拟函 数具有一样的返回类型
-具有虚拟行为的非成员函数很简单首先编写一个虚拟函数完成工作，然后再写衣一个非虚拟函数，它什么也不做只是调用这个函数，可以使用内联来避免函数调用的开销
+在类中构建一个虚拟函数，其功能仅仅是实现构造函数，就可以对外界提供**一组派生类的公共构造接口**，这就是虚拟构造函数了。
+```
+class NLComponent {               //用于 newsletter components  
+public:                           // 的抽象基类  
+  ...                             //包含至少一个纯虚函数 
+}; 
+class TextBlock: public NLComponent { 
+public: 
+  ...                             // 不包含纯虚函数 
+};  
+class Graphic: public NLComponent { 
+public: 
+  ...                             // 不包含纯虚函数 
+}; 
+
+class NewsLetter
+{ 
+public: 
+  ...  
+private: 
+  // 为建立下一个NLComponent对象从str读取数据, 
+  // 建立component 并返回一个指针。 
+  static NLComponent * readComponent(istream& str); 
+   ... 
+}; 
+  NewsLetter::NewsLetter(istream& str) // 这就是虚拟构造函数了
+  { 
+    while (str) { 
+        components.push_back(readComponent(str)); //根据输入的数据不同，建立的不同的派生类对象
+    } 
+ } 
+```
+
+虚拟拷贝构造函数也是可以实现的，但是要利用到最近才被采纳的较宽松的虚拟函数返回值类型规则，被派生类重定义的虚拟函数不用必须与基类的虚拟函数具有一样的返回类型。
+```	
+class NLComponent { 
+public: 
+  // declaration of virtual copy constructor 
+  virtual NLComponent * clone() const = 0; 
+  ...  
+ }
+class TextBlock: public NLComponent { 
+public: 
+  virtual TextBlock * clone() const         // virtual copy 
+  { return new TextBlock(*this); }          // constructor 
+  ...  
+};  
+class Graphic: public NLComponent { 
+public: 
+  virtual Graphic * clone() const            // virtual copy constructor ，返回值不一定要和基类的类型相同
+  { return new Graphic(*this); }             
+  ...  
+}; 
+//有了虚拟拷贝构造函数，新派生类的拷贝构造变得很容易了
+NewsLetter::NewsLetter(const NewsLetter& rhs) 
+{
+	__foreach(rhs,it)
+	{  
+		components.push_back((*it)->clone()); //
+	} 
+} 
+```
+具有虚拟行为的非成员函数很简单首先编写一个虚拟函数完成工作，然后再写一个非虚拟函数，它什么也不做只是调用这个函数，可以使用内联来避免函数调用的开销.
+```
+class NLComponent { 
+public: 
+  virtual ostream& print(ostream& s) const = 0; 
+  ...  
+};  
+class TextBlock: public NLComponent { 
+public: 
+  virtual ostream& print(ostream& s) const; 
+  ...  
+};  
+class Graphic: public NLComponent { 
+public: 
+  virtual ostream& print(ostream& s) const; 
+  ...  
+};  
+inline ostream& operator<<(ostream& s, const NLComponent& c) 
+{ 
+  return c.print(s); 
+} 
+//做的好，现在可以正常语法调用他们了,如果他是成员函数，得反过来，g<< cout;
+TextBlock t;
+Graphic g;
+cout << t << g;
+
+```
 
 ##Item 26：限制某个类所能产生的对象数量
-只 有一个对象：使用单一模式，将类的构造函数声明为private，再声明一个静态函数，该函数中有一个类的静态对象不将该静态对象放在类中原因是放在函 数中时，执行函数时才建立对象，并且对象初始化时间确定的，即第一次执行该函数时另外，该函数不能声明为内联，如果内联可能造成程序的静态对象拷贝超过 一个
-限制对象个数：建立一个基类，构造函数中计数加一，若超过最大值则抛出异常；析构函数中计数减一
-编程点滴：
-将模板类的定义和实现放在一个文件中，否则将造成引用未定义错误（血的教训）；
-静态数据成员需要先声明再初始化；
-用常量值作初始化的有序类型的const静态数据成员是一个常量表达式（可以作为数组定义的维数）；
-构造函数中抛出异常，将导致静态数组成员重新初始化
+只有一个对象：使用单一模式，将类的构造函数声明为private，再声明一个静态函数，该函数中有一个类的静态对象，不将该静态对象放在类中原因是放在函数中时，执行函数时才建立对象，并且对象初始化时间确定的，即第一次执行该函数时，另外，**该函数不能声明为内联，如果内联可能造成程序的静态对象拷贝**。(大师多次，多次提到不同编译单元，translation unit（也就是生成一个object文件的源代码的集合）内的静态成员被初始化顺序是不确定的)。
+```
+class Printer { 
+public: 
+  static Printer& thePrinter(); 
+  ... 
+private: 
+  Printer(); 
+  Printer(const Printer& rhs); 
+  ...  
+}; 
+Printer& Printer::thePrinter() //单例模式惯用法，被称之为Meyers' Singleton ？
+{ 
+  static Printer p; 
+  return p; 
+} 
+```
+超过一个限制对象个数：建立一个基类，构造函数中计数加一，若超过最大值则抛出异常；析构函数中计数减一。
+```
+#include <iostream>
+#include<exception>
+using namespace std;
+template<class BeingCounted> 
+class Counted { 
+public: 
+  class TooManyObjects:public exception{};                     // 用来抛出异常  
+  static int objectCount() { return numObjects; }  
+protected: 
+  Counted(); 
+  Counted(const Counted& rhs);  
+  ~Counted() { --numObjects; }  
+private: 
+  static int numObjects; 
+  static const int maxObjects;  
+  void init();                                // 避免构造函数的 
+};
+
+template<class BeingCounted> 
+Counted<BeingCounted>::Counted() 
+{ init(); }  
+template<class BeingCounted> 
+Counted<BeingCounted>::Counted(const Counted<BeingCounted>&) 
+{ init(); }  
+template<class BeingCounted> 
+void Counted<BeingCounted>::init() 
+{ 
+  if (numObjects >= maxObjects) throw TooManyObjects(); 
+  ++numObjects;
+}
+
+class Printer: private Counted<Printer> { 
+public: 
+  // 伪构造函数 
+  static Printer * makePrinter()
+  {
+  	return new Printer;
+  }
+  static Printer * makePrinter(const Printer& rhs)
+  {
+  	return new Printer(rhs);
+  }
+  ~Printer();  
+  // private继承，这里我们必须使用using来恢复public访问，当然不是必须，如果你没用到的话
+  using Counted<Printer>::objectCount;      
+  using Counted<Printer>::TooManyObjects;  
+private: 
+  Printer(){}; 
+  Printer(const Printer& rhs){}; 
+};
+      
+const int Counted<Printer>::maxObjects = 1; 
+int Counted<Printer>::numObjects; //自动初始化为0
+
+int main()
+{
+	try
+	{
+	   Printer * p = Printer::makePrinter();
+	   Printer * p2 = Printer::makePrinter();   
+	}catch(std::exception& e)
+	{
+		cout<<e.what();
+	}
+	
+	return 0;
+}
+
+```
 
 
 ##Item 27：要求或禁止在堆中产生对象
-在堆中的对象不一定是用new分配的对象，例如成员对象，虽然不是用new分配的但是仍然在堆中
-要 求在堆中建立对象可以将析构函数声明未private，再建立一个虚拟析构函数进行对象析构此时如果建立非堆对象将导致析构函数不能通过编译当然也可 以将构造函数声明为private，但是这样将导致必须声明n个构造函数（缺省，拷贝等等）为了解决继承问题，可以将其声明为protected，解决 包容问题则只能将其声明为指针
-没有办法不能判断一个对象是否在堆中，但是可以判断一个对象是否可以安全用delete删除，只需在operator new中将其指针加入一个列表，然后根据此列表进行判断
-把一个指针dynamic_cast成void*类型（或const void*或volatile void*等），生成的指针将指向原指针指向对象内存的开始处但是dynamic_cast只能用于指向至少具有一个虚拟函数的对象的指针上
+```
+//只能new的对象
+class ObjNewOnly
+{
+public:
+	ObjNewOnly（）{};
+	void destory() const //需要帮忙delete this
+	{
+		delete this;		
+	}
+private:// 应该改为protected:成员才能fix继承和组合问题
+	~ObjNewOnly()
+	{
+		cout << "destorying"<<endl;
+	}
+};
+//当你需要继承，或者组合时，遇到了困难，使用protected来解决继承问题，
+// protected成员，派生类可以访问 b
+int main(int argc, char *argv[])
+{
+	ObjNewOnly *po = new ObjNewOnly;
+	po->destory();
+//	delete po;// error 
+	return 0;
+}
+```
+没有办法不能判断一个对象是否在堆中，但是可以判断一个对象是否可以安全用delete删除，只需在operator new中将其指针加入一个列表，然后根据此列表进行判断。
+把一个指针dynamic_cast成void*类型（或const void*或volatile void*等），生成的指针将指向原指针指向对象内存的开始处，但是dynamic_cast只能用于指向至少具有一个虚拟函数的对象的指针上。有点走火入魔了啊。。。。
 禁止建立堆对象可以简单的将operator new声明为private，但是仍然不能判断其是否在堆中
 
 ##Item 28：灵巧（smart）指针
-灵巧指针的用处是可以对操作进行封装，同一用户接口
-灵巧指针从模板生成，因为要与内建指针类似，必须是强类型的；模板参数确定指向对象的类型
-灵巧指针的拷贝和赋值，采取的方案是当auto_ptr被拷贝和赋值时，对象所有权随之被传递此时，通过传值方式传递灵巧指针对象将导致不确定的后果，应该使用引用
-记住当返回类型是基类而返回对象实际上派生类对象时，不能传递对象，应该传递引用或指针，否则将产生对象切割
+（note，晚点回来细读）
+灵巧指针的用处是可以对操作进行封装，统一用户接口。
+灵巧指针从模板生成，因为要与内建指针类似，必须是强类型的；模板参数确定指向对象的类型。
+灵巧指针的拷贝和赋值，采取的方案是当auto_ptr被拷贝和赋值时，对象所有权随之被传递此时，通过传值方式传递灵巧指针对象将导致不确定的后果，应该使用引用。
+记住当返回类型是基类而返回对象实际上派生类对象时，不能传递对象，应该传递引用或指针，否则将产生对象切割。
 测试灵巧指针是否为NULL有两种方案：一种是使用类型转换，将其转换为void*，但是这样将导致类型不安全，因为不同类型的灵巧指针之间将能够互相比较；另一种是重载operator!，这种方案只能使用!ptr这种方式检测
 最好不要提供转换到内建指针的隐式类型转换操作符，直接提供内建指针将破坏灵巧指针的灵巧特性
 灵巧指针的继承类到基类的类型转换的一个最佳解决方案是使用模板成员函数，这将使得内建指针所有可以转换的类型也可以在灵巧指针中进行转换但是对于间接继承的情况，必须用dynamic_cast指定其要转换的类型是直接基类还是间接基类
 为了实现const灵巧指针，可以新建一个类，该类从非const灵巧指针继承这样的化，const灵巧指针能做的，非const灵巧指针也能做，从而与标准形式相同
 
 ##Item 29：引用计数
-使用引用计数后，对象自己拥有自己，当没有人再使用它时，它自己自动销毁自己因此，引用计数是个简单的垃圾回收体系
+不错的string refcount实现。
+使用引用计数后，对象自己拥有自己，当没有人再使用它时，它自己自动销毁自己因此，引用计数是个简单的垃圾回收体系。
 在基类中调用delete this将导致派生类的对象被销毁
 写时拷贝：与其它对象共享一个值直到写操作时才拥有自己的拷贝它是Lazy原则的特例
 精彩的类层次结构：
-RCObject类提供计数操作；StringValue包含指向数据的指针并继承RCObject的计数操作；RCPtr是一个灵巧指针，封装了本属于String的一些计数操作
+RCObject类提供计数操作；StringValue包含指向数据的指针并继承RCObject的计数操作；RCPtr是一个灵巧指针，封装了本属于String的一些计数操作。
 
 ##Item 30：代理类
 可以用两个类来实现二维数组：Array1D是一个一维数组，而Array2D则是一个Array1D的一维数组Array1D的实例扮演的是一个在概念上不存在的一维数组，它是一个代理类
